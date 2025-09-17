@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { use, useMemo, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useAuctionDataForNFT } from "@/app/hooks/useAuctionData";
 import { useBidDataForAuction } from "@/app/hooks/useBidData";
+import { useNFTData } from "@/app/hooks/useNFTData";
 import { Footer } from "@/components/Footer";
 import Link from "next/link";
 
@@ -24,24 +25,11 @@ interface NFTDetailsPageProps {
 }
 
 export default function NFTDetailsPage({ params }: NFTDetailsPageProps) {
-  const [nft, setNft] = useState<unknown>(null);
-  const [collectionStats, setCollectionStats] = useState<{ 
-    tokenCount?: number;
-    ownerCount?: number;
-    mintCount?: number;
-    totalQuantity?: number;
-  } | null>(null);
-  const [transfers, setTransfers] = useState<Array<{
-    from_address: string;
-    to_address: string;
-    block_timestamp: string;
-    block_number: number;
-  }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
   // Unwrap params with React.use() for Next.js 15 compatibility
   const { id } = use(params);
+  
+  // Use optimized data fetching hook
+  const { nft, collectionStats, transfers, loading, error } = useNFTData(id);
   
   // Get auction data for this specific NFT
   const { auction } = useAuctionDataForNFT(id);
@@ -49,172 +37,14 @@ export default function NFTDetailsPage({ params }: NFTDetailsPageProps) {
   // Get bid data for this auction
   const { bidCount, highestBid } = useBidDataForAuction(auction?.id || "");
 
-  // Fetch live NFT data from Insight
-  useEffect(() => {
-    async function fetchNft() {
-      setLoading(true);
-      setError(null);
-      try {
-        console.log("Fetching NFT for token ID:", id);
-        console.log("Collection Address:", process.env.NEXT_PUBLIC_NFT_COLLECTION_ADDRESS);
-        
-        // Use the individual NFT endpoint - this works correctly!
-        const url = `https://8453.insight.thirdweb.com/v1/nfts/${process.env.NEXT_PUBLIC_NFT_COLLECTION_ADDRESS}/${id}?chain=8453`;
-        console.log("NFT Fetch URL:", url);
-        
-        const res = await fetch(url, {
-          headers: {
-            "X-Client-Id": process.env.NEXT_PUBLIC_CLIENT_ID!,
-          },
-        });
-        
-        console.log("NFT Response status:", res.status);
-        
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("NFT fetch failed:", res.status, errorText);
-          throw new Error(`Failed to fetch NFT: ${res.status} - ${errorText}`);
-        }
-        
-        const data = await res.json();
-        console.log("NFT Data received:", data);
-        // The API returns data in a 'data' array, so we need to get the first item
-        if (data.data && data.data.length > 0) {
-          setNft(data.data[0]);
-        } else {
-          setNft(data); // Fallback if data structure is different
-        }
-      } catch (err) {
-        console.error("Error fetching NFT:", err);
-        setError(`Error loading NFT: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchNft();
-  }, [id]);
-
-  // Fetch collection stats
-  useEffect(() => {
-    async function fetchCollectionStats() {
-      try {
-        console.log("Fetching collection stats for token ID:", id);
-        
-        // Use the collections endpoint with stats for the NFT collection
-        const res = await fetch(
-          `https://8453.insight.thirdweb.com/v1/nfts/collections/${process.env.NEXT_PUBLIC_NFT_COLLECTION_ADDRESS}?chain=8453&include_stats=true`,
-          {
-            headers: {
-              "X-Client-Id": process.env.NEXT_PUBLIC_CLIENT_ID!,
-            },
-          }
-        );
-        
-        console.log("Collection stats response status:", res.status);
-        
-        if (res.ok) {
-          const data = await res.json();
-          console.log("Collection stats data:", data);
-          
-          // The API returns data in a 'data' array, get the first collection
-          if (data.data && data.data.length > 0 && data.data[0].stats) {
-            const stats = data.data[0].stats;
-            setCollectionStats({
-              ownerCount: stats.owner_count || 0,
-              mintCount: stats.mint_count || 0,
-              tokenCount: stats.token_count || 0,
-              totalQuantity: stats.total_quantity || 0
-            });
-          } else {
-            console.log("No stats found in collection data");
-            setCollectionStats(null);
-          }
-        } else {
-          console.log("Collection stats API failed:", res.status);
-          setCollectionStats(null);
-        }
-      } catch (err) {
-        console.error("Error fetching collection stats:", err);
-        setCollectionStats(null);
-      }
-    }
-    fetchCollectionStats();
-  }, [id]);
-
-  // Fetch NFT transfers (sales/ownership changes) for this specific token
-  useEffect(() => {
-    async function fetchTransfers() {
-      try {
-        console.log("Fetching transfers for token ID:", id, "with type", typeof id);
-        
-        // Check if token ID is valid (greater than 0)
-        const tokenId = parseInt(id);
-        if (isNaN(tokenId) || tokenId <= 0) {
-          console.log("Invalid token ID, skipping transfers fetch");
-          setTransfers([]);
-          return;
-        }
-        
-        // Get transfers for this specific NFT token
-        const res = await fetch(
-          `https://8453.insight.thirdweb.com/v1/nfts/transfers?chain=8453&contract_addresses=${process.env.NEXT_PUBLIC_NFT_COLLECTION_ADDRESS}&token_ids=${tokenId}&sort_order=desc&limit=10`,
-          {
-            headers: {
-              "X-Client-Id": process.env.NEXT_PUBLIC_CLIENT_ID!,
-            },
-          }
-        );
-        
-        console.log("Transfers response status:", res.status);
-        
-        if (res.ok) {
-          const data = await res.json();
-          console.log("Transfers data:", data);
-          setTransfers(data.data || []);
-        } else {
-          console.log("No transfers found for token ID:", tokenId);
-          setTransfers([]);
-        }
-      } catch (err) {
-        console.error("Error fetching transfers:", err);
-        setTransfers([]);
-      }
-    }
-    fetchTransfers();
-  }, [id]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-foreground">Loading...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-destructive">{error}</div>
-      </div>
-    );
-  }
-
-  if (!nft) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-foreground">NFT not found</div>
-      </div>
-    );
-  }
-
-  // Helper functions for auction data
-  const formatPrice = (price: string) => {
+  // Memoized helper functions to prevent recreation on every render
+  const formatPrice = useCallback((price: string) => {
     const numPrice = Number(price);
     if (numPrice === 0) return "No bids";
     return `${(numPrice / 1e18).toFixed(4)} ETH`;
-  };
+  }, []);
 
-  const formatTimeRemaining = (endTime: number) => {
+  const formatTimeRemaining = useCallback((endTime: number) => {
     const now = Math.floor(Date.now() / 1000);
     const remaining = endTime - now;
     if (remaining <= 0) return "Ended";
@@ -226,16 +56,35 @@ export default function NFTDetailsPage({ params }: NFTDetailsPageProps) {
     if (days > 0) return `${days}d ${hours}h`;
     if (hours > 0) return `${hours}h ${minutes}m`;
     return `${minutes}m`;
-  };
+  }, []);
 
-  const endDate = auction?.endTimeInSeconds 
-    ? new Date(Number(auction.endTimeInSeconds) * 1000).toLocaleString()
-    : null;
+  // Memoize computed values to prevent unnecessary recalculations
+  const endDate = useMemo(() => 
+    auction?.endTimeInSeconds 
+      ? new Date(Number(auction.endTimeInSeconds) * 1000).toLocaleString()
+      : null,
+    [auction?.endTimeInSeconds]
+  );
   
-  const currentBid = auction?.currentBid || auction?.minimumBidPrice;
-  const startingPrice = auction?.minimumBidPrice;
-  const buyNowPrice = auction?.buyoutPrice;
-  const isActive = auction?.status === "CREATED";
+  const currentBid = useMemo(() => 
+    auction?.currentBid || auction?.minimumBidPrice,
+    [auction?.currentBid, auction?.minimumBidPrice]
+  );
+  
+  const startingPrice = useMemo(() => 
+    auction?.minimumBidPrice,
+    [auction?.minimumBidPrice]
+  );
+  
+  const buyNowPrice = useMemo(() => 
+    auction?.buyoutPrice,
+    [auction?.buyoutPrice]
+  );
+  
+  const isActive = useMemo(() => 
+    auction?.status === "CREATED",
+    [auction?.status]
+  );
 
   // Type the NFT data properly
   const nftData = nft as {
@@ -256,7 +105,31 @@ export default function NFTDetailsPage({ params }: NFTDetailsPageProps) {
       platform?: string;
       attributes?: Array<{ trait_type: string; value: string }>;
     };
-  };
+  } | null;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-destructive">{error}</div>
+      </div>
+    );
+  }
+
+  if (!nft || !nftData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-foreground">NFT not found</div>
+      </div>
+    );
+  }
 
   return (
     <TooltipProvider>
