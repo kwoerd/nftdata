@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThirdwebProvider } from "thirdweb/react";
-import { base } from "thirdweb/chains";
 import "./globals.css";
 
 const geistSans = Geist({
