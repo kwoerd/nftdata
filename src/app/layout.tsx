@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ThirdwebProvider } from "thirdweb/react";
+import { base } from "thirdweb/chains";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,7 +29,14 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <ThirdwebProvider
+          clientId={process.env.NEXT_PUBLIC_CLIENT_ID!}
+          supportedChains={[base]}
+          activeChain={base}
+          locale="en"
+        >
+          {children}
+        </ThirdwebProvider>
       </body>
     </html>
   );
