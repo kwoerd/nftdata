@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import { getAllListings } from "thirdweb/extensions/marketplace";
-import { marketplaceContract } from "@/lib/thirdweb";
 
 export interface AuctionData {
   id: string;
@@ -9,7 +7,7 @@ export interface AuctionData {
   seller: string;
   currencyContractAddress: string;
   buyoutPrice: string;
-  buyoutBidAmount: string;
+  currentBid: string;
   minimumBidPrice: string;
   startTimeInSeconds: number;
   endTimeInSeconds: number;
@@ -36,35 +34,80 @@ export function useAuctionData() {
       setLoading(true);
       setError(null);
       try {
-        console.log("Fetching auction data using Thirdweb SDK...");
+        console.log("Fetching auction data from Insight API...");
         
-        // Use Thirdweb SDK to get all marketplace listings
-        const listings = await getAllListings({ contract: marketplaceContract });
-        console.log("Marketplace listings:", listings);
+        // Fetch auction events from marketplace using Insight API
+        const auctionEventsUrl = `https://8453.insight.thirdweb.com/v1/${process.env.NEXT_PUBLIC_CLIENT_ID}/events?chain=8453&contract_addresses=${process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS}&event_signatures=AuctionCreated(address,uint256,address,uint256,uint256,uint256,uint256,address,uint64)&sort_order=desc&limit=100`;
+        
+        const auctionRes = await fetch(auctionEventsUrl, {
+          headers: {
+            "X-Client-Id": process.env.NEXT_PUBLIC_CLIENT_ID!,
+          },
+        });
 
-        // Process listings to get auction data
+        if (!auctionRes.ok) {
+          throw new Error(`Failed to fetch auction events: ${auctionRes.status}`);
+        }
+
+        const auctionData = await auctionRes.json();
+        console.log("Auction events:", auctionData);
+
+        // Fetch bid events
+        const bidEventsUrl = `https://8453.insight.thirdweb.com/v1/${process.env.NEXT_PUBLIC_CLIENT_ID}/events?chain=8453&contract_addresses=${process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS}&event_signatures=BidPlaced(address,uint256,address,uint256,uint256)&sort_order=desc&limit=1000`;
+        
+        const bidRes = await fetch(bidEventsUrl, {
+          headers: {
+            "X-Client-Id": process.env.NEXT_PUBLIC_CLIENT_ID!,
+          },
+        });
+
+        let bidData = { data: [] };
+        if (bidRes.ok) {
+          bidData = await bidRes.json();
+        }
+
+        console.log("Bid events:", bidData);
+
+        // Process auction data
+        const now = Math.floor(Date.now() / 1000);
         const processedAuctions = await Promise.all(
-          listings.map(async (listing: unknown) => {
+          auctionData.data.map(async (event: unknown) => {
             try {
-              const listingData = listing as {
-                id: string;
-                assetContractAddress: string;
-                tokenId: string;
-                seller: string;
-                currencyContractAddress: string;
-                buyoutPrice?: string;
-                buyoutBidAmount?: string;
-                minimumBidPrice?: string;
-                startTimeInSeconds?: number;
-                endTimeInSeconds?: number;
-                status?: string;
+              const eventData = event as {
+                data: {
+                  auctionId?: string;
+                  tokenId?: string;
+                  nftContract?: string;
+                  seller?: string;
+                  startingPrice?: string;
+                  buyNowPrice?: string;
+                  endTime?: string;
+                };
+                topics: string[];
               };
               
-              // Fetch NFT metadata
+              const tokenId = eventData.data.tokenId || eventData.topics[2];
+              const auctionId = eventData.data.auctionId || eventData.topics[1];
+              
+              // Find highest bid for this auction
+              const auctionBids = bidData.data.filter((bid: unknown) => {
+                const bidEvent = bid as { data: { auctionId?: string }; topics: string[] };
+                return bidEvent.data.auctionId === auctionId || bidEvent.topics[1] === auctionId;
+              });
+              
+              const highestBid = auctionBids.reduce((highest: unknown, bid: unknown) => {
+                const bidEvent = bid as { data: { bidAmount?: string; amount?: string } };
+                const highestEvent = highest as { data: { bidAmount?: string; amount?: string } };
+                const bidAmount = Number(bidEvent.data.bidAmount || bidEvent.data.amount || 0);
+                const currentHighest = Number(highestEvent.data.bidAmount || highestEvent.data.amount || 0);
+                return bidAmount > currentHighest ? bid : highest;
+              }, auctionBids[0] || null);
+
+              // Fetch NFT data
               let nftData = null;
               try {
                 const nftRes = await fetch(
-                  `https://8453.insight.thirdweb.com/v1/nfts/${process.env.NEXT_PUBLIC_NFT_COLLECTION_ADDRESS}/${listingData.tokenId}?chain=8453`,
+                  `https://8453.insight.thirdweb.com/v1/nfts/${process.env.NEXT_PUBLIC_NFT_COLLECTION_ADDRESS}/${tokenId}?chain=8453`,
                   {
                     headers: {
                       "X-Client-Id": process.env.NEXT_PUBLIC_CLIENT_ID!,
@@ -76,25 +119,41 @@ export function useAuctionData() {
                   nftData = nftJson.data?.[0] || nftJson;
                 }
               } catch (err) {
-                console.warn(`Failed to fetch NFT data for token ${listingData.tokenId}:`, err);
+                console.warn(`Failed to fetch NFT data for token ${tokenId}:`, err);
               }
 
+              const endTime = Number(eventData.data.endTime || 0);
+              const isActive = endTime > now;
+
               return {
-                id: listingData.id,
-                assetContractAddress: listingData.assetContractAddress,
-                tokenId: listingData.tokenId,
-                seller: listingData.seller,
-                currencyContractAddress: listingData.currencyContractAddress,
-                buyoutPrice: listingData.buyoutPrice || "0",
-                buyoutBidAmount: listingData.buyoutBidAmount || "0",
-                minimumBidPrice: listingData.minimumBidPrice || "0",
-                startTimeInSeconds: listingData.startTimeInSeconds || 0,
-                endTimeInSeconds: listingData.endTimeInSeconds || 0,
-                status: (listingData.status as "CREATED" | "COMPLETED" | "CANCELLED") || "CREATED",
-                nftData: nftData
+                id: auctionId,
+                assetContractAddress: eventData.data.nftContract || process.env.NEXT_PUBLIC_NFT_COLLECTION_ADDRESS,
+                tokenId: tokenId,
+                seller: eventData.data.seller || eventData.topics[3],
+                currencyContractAddress: "0x0000000000000000000000000000000000000000", // ETH
+                buyoutPrice: eventData.data.buyNowPrice || "0",
+                currentBid: highestBid ? (highestBid as { data: { bidAmount?: string; amount?: string } }).data.bidAmount || (highestBid as { data: { bidAmount?: string; amount?: string } }).data.amount || "0" : eventData.data.startingPrice || "0",
+                minimumBidPrice: eventData.data.startingPrice || "0",
+                startTimeInSeconds: now,
+                endTimeInSeconds: endTime,
+                status: isActive ? "CREATED" : "COMPLETED",
+                nftData: nftData ? {
+                  name: nftData.name || `NFT #${tokenId}`,
+                  image_url: nftData.extra_metadata?.image_url || nftData.image_url || "",
+                  extra_metadata: {
+                    image_url: nftData.extra_metadata?.image_url || nftData.image_url,
+                    rank: nftData.extra_metadata?.rank,
+                    rarity_percent: nftData.extra_metadata?.rarity_percent,
+                    rarity_tier: nftData.extra_metadata?.rarity_tier,
+                  }
+                } : {
+                  name: `NFT #${tokenId}`,
+                  image_url: "",
+                  extra_metadata: {}
+                }
               };
             } catch (err) {
-              console.error("Error processing listing:", err);
+              console.error("Error processing auction:", err);
               return null;
             }
           })

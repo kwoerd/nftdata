@@ -114,7 +114,7 @@ export default function NFTCollectionGrid() {
                   
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Current Bid:</span>
-                    <span className="font-medium">{formatPrice(auction.buyoutBidAmount)}</span>
+                    <span className="font-medium">{formatPrice(auction.currentBid)}</span>
                   </div>
                   
                   <div className="flex justify-between items-center text-sm">

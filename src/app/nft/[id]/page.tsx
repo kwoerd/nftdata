@@ -232,7 +232,7 @@ export default function NFTDetailsPage({ params }: NFTDetailsPageProps) {
     ? new Date(Number(auction.endTimeInSeconds) * 1000).toLocaleString()
     : null;
   
-  const currentBid = highestBid?.bidAmount || auction?.minimumBidPrice;
+  const currentBid = auction?.currentBid || auction?.minimumBidPrice;
   const startingPrice = auction?.minimumBidPrice;
   const buyNowPrice = auction?.buyoutPrice;
   const isActive = auction?.status === "CREATED";
