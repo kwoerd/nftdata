@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Navigation } from "@/components/Navigation";
+import { Footer } from "@/components/Footer";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import NFTCollectionGrid from "@/components/ui/NFTCollectionGrid";
 
 interface Event {
@@ -44,7 +47,7 @@ export default function Home() {
     hex ? (hex.startsWith("0x") ? hex.slice(0, 10) : hex.slice(0, 8)) : "—";
 
   return (
-    <main className="bg-[#222] min-h-screen">
+    <main className="bg-background min-h-screen">
       <div className="mx-auto max-w-5xl px-4 py-10">
         {/* Navigation */}
         <div className="mb-8">
@@ -53,17 +56,22 @@ export default function Home() {
 
         {/* Content */}
         {currentView === "events" ? (
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 shadow-lg">
+          <div className="rounded-sm border bg-card shadow-sm relative">
+            {loading && (
+              <div className="absolute top-0 left-0 right-0 z-10">
+                <Progress value={33} className="h-1" />
+              </div>
+            )}
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-neutral-800 px-6 py-4">
+            <div className="flex items-center justify-between border-b px-6 py-4">
               <div>
-                <h2 className="text-xl font-semibold text-neutral-100">Recent Events</h2>
-                <p className="mt-1 text-sm text-neutral-300">Latest contract events</p>
+                <h2 className="text-xl font-medium text-foreground">Recent Events</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Latest contract events</p>
               </div>
               <button
                 onClick={fetchData}
                 disabled={loading}
-                className="rounded-lg border border-neutral-700 p-2 text-neutral-200 hover:bg-neutral-800 disabled:opacity-60"
+                className="rounded-sm border p-2 text-muted-foreground hover:bg-muted disabled:opacity-60"
                 title="Refresh"
               >
                 <svg
@@ -77,21 +85,21 @@ export default function Home() {
             </div>
 
           {/* Scroll area */}
-          <div className="custom-scrollbar h-[440px] overflow-y-auto px-4 py-5">
+          <ScrollArea className="h-[440px] px-4 py-5">
             {data.map((event, idx) => (
               <div
                 key={`${event.transaction_hash}-${idx}`}
-                className="mb-4 rounded-xl border border-neutral-800 bg-neutral-900/70 px-4 py-3"
+                className="mb-4 rounded-sm border bg-card px-4 py-3"
               >
                 {/* Row 1: title + right meta */}
                 <div className="flex items-start justify-between gap-4">
-                  <h3 className="text-base font-semibold text-neutral-100">
+                  <h3 className="text-base font-medium text-foreground">
                     {short(event.topics?.[0])}
                   </h3>
                   <div className="text-right">
-                    <p className="text-xs text-neutral-400">{fmt(event.block_timestamp)}</p>
+                    <p className="text-xs text-muted-foreground">{fmt(event.block_timestamp)}</p>
                     <a
-                      className="mt-1 inline-block text-xs text-blue-400 hover:text-blue-300"
+                      className="mt-1 inline-block text-xs text-muted-foreground hover:text-foreground"
                       href={`https://etherscan.io/tx/${event.transaction_hash}`}
                       target="_blank" rel="noopener noreferrer"
                     >
@@ -102,32 +110,32 @@ export default function Home() {
 
                 {/* Row 2: details */}
                 <div className="mt-2 space-y-1">
-                  <p className="text-sm text-neutral-300">
+                  <p className="text-sm text-muted-foreground">
                     Contract:{" "}
-                    <span className="font-mono text-neutral-200">{event.address}</span>
+                    <span className="font-mono text-foreground">{event.address}</span>
                   </p>
-                  <p className="text-sm text-neutral-300">
+                  <p className="text-sm text-muted-foreground">
                     Log Index:{" "}
-                    <span className="font-mono text-neutral-200">#{event.log_index}</span>
+                    <span className="font-mono text-foreground">#{event.log_index}</span>
                   </p>
-                  <p className="break-all text-sm text-neutral-300">
+                  <p className="break-all text-sm text-muted-foreground">
                     Data:{" "}
-                    <span className="font-mono text-neutral-200">{event.data}</span>
+                    <span className="font-mono text-foreground">{event.data}</span>
                   </p>
                 </div>
 
                 {/* Row 3: chips (optional, like the reference) */}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <span className="rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-300">
+                  <span className="rounded-sm bg-muted px-2 py-1 text-xs text-muted-foreground">
                     Block #{event.block_number}
                   </span>
-                  <span className="rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-300">
+                  <span className="rounded-sm bg-muted px-2 py-1 text-xs text-muted-foreground">
                     Param #1: {event.topics?.[1] ? "0x…" + event.topics[1].slice(-6) : "—"}
                   </span>
-                  <span className="rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-300">
+                  <span className="rounded-sm bg-muted px-2 py-1 text-xs text-muted-foreground">
                     Param #2: {event.topics?.[2] ? "0x…" + event.topics[2].slice(-6) : "—"}
                   </span>
-                  <span className="rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-300">
+                  <span className="rounded-sm bg-muted px-2 py-1 text-xs text-muted-foreground">
                     Param #3: {event.topics?.[3] ? "0x…" + event.topics[3].slice(-6) : "—"}
                   </span>
                 </div>
@@ -135,22 +143,23 @@ export default function Home() {
             ))}
 
             {data.length === 0 && (
-              <p className="px-2 py-8 text-center text-sm text-neutral-400">
+              <p className="px-2 py-8 text-center text-sm text-muted-foreground">
                 No events found.
               </p>
             )}
-          </div>
+          </ScrollArea>
         </div>
         ) : (
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 shadow-lg p-6">
+          <div className="rounded-sm border bg-card shadow-sm p-6">
             <div className="mb-6">
-              <h2 className="text-xl font-semibold text-neutral-100">NFT Collection</h2>
-              <p className="mt-1 text-sm text-neutral-300">Browse NFTs from the collection</p>
+              <h2 className="text-xl font-medium text-foreground">NFT Collection</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Browse NFTs from the collection</p>
             </div>
             <NFTCollectionGrid />
           </div>
         )}
       </div>
+      <Footer />
     </main>
   );
 }

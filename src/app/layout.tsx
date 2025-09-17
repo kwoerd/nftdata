@@ -29,12 +29,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThirdwebProvider
-          clientId={process.env.NEXT_PUBLIC_CLIENT_ID!}
-          supportedChains={[base]}
-          activeChain={base}
-          locale="en"
-        >
+        <ThirdwebProvider>
           {children}
         </ThirdwebProvider>
       </body>

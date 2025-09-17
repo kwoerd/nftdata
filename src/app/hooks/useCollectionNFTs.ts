@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 // Fetch NFTs directly from Insight API
 export function useCollectionNFTs() {
-  const [nfts, setNfts] = useState<any[]>([]);
+  const [nfts, setNfts] = useState<unknown[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

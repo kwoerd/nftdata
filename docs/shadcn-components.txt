@@ -6,7 +6,7 @@ use for answers to most common questions
 pnpm dlx shadcn@latest add accordion
 
 alert
-use for notifications
+use for notifications 
 pnpm dlx shadcn@latest add alert
 
 badge
