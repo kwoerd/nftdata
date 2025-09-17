@@ -16,6 +16,7 @@ import { useAuctionDataForNFT } from "@/app/hooks/useAuctionData";
 import { useBidDataForAuction } from "@/app/hooks/useBidData";
 import { useNFTData } from "@/app/hooks/useNFTData";
 import { Footer } from "@/components/Footer";
+import { ThemeToggle } from "@/components/theme-toggle";
 import Link from "next/link";
 
 interface NFTDetailsPageProps {
@@ -136,25 +137,28 @@ export default function NFTDetailsPage({ params }: NFTDetailsPageProps) {
       <div className="min-h-screen bg-background py-10">
         <div className="mx-auto max-w-6xl px-4">
         {/* Breadcrumb Navigation */}
-        <Breadcrumb className="mb-6">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/">Home</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/?view=nft">NFT Collection</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{nftData.name || `NFT #${id}`}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+        <div className="flex items-center justify-between mb-6">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href="/">Home</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href="/?view=nft">NFT Collection</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{nftData.name || `NFT #${id}`}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          <ThemeToggle />
+        </div>
 
         <Card className="p-8">
           <div className="flex gap-10 flex-col md:flex-row">
